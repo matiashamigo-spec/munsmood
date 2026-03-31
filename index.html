@@ -141,10 +141,7 @@
 
 <script>
 (function() {
-  var INIT_URL = "https://infomuns.vercel.app/api/munsmood-init";
-  var GEMINI   = "https://generativelanguage.googleapis.com/v1beta/models/";
-  var DETECT_MODEL  = "gemini-3-flash-preview";
-  var COMPOSE_MODEL = "gemini-2.5-flash-image";
+  var API_URL = "https://infomuns-production.up.railway.app/api/munsmood/process";
 
   var uploadArea     = document.getElementById("mm-upload-area");
   var fileInput      = document.getElementById("mm-file-input");
@@ -171,28 +168,6 @@
   var currentWidth   = 0;
   var currentHeight  = 0;
   var stream         = null;
-  var mmInit         = null; // { apiKey, mun, opaq }
-
-  var EMOTION_ACTIONS = {
-    HAPPY_NEUTRAL:   { text:"Los Muns te están acompañando 😊", useMun:true,  useOpaq:false },
-    SAD:             { text:"OPAQ llegó a darte un abrazo 🫂",   useMun:false, useOpaq:true  },
-    HUG_TWO:         { text:"¡MUN acepta el abrazo! 🤗",         useMun:true,  useOpaq:false },
-    TONGUE_OUT:      { text:"¡MUN y OPAQ también! 😜",           useMun:true,  useOpaq:true  },
-    MULTIPLE_PEOPLE: { text:"Los Muns se suman al grupo 🎉",     useMun:true,  useOpaq:false }
-  };
-
-  // Pre-fetch init (API key + character images)
-  prefetchInit();
-
-  function prefetchInit() {
-    fetch(INIT_URL, { cache: "no-store" })
-      .then(function(r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      })
-      .then(function(d) { mmInit = d; console.log("[MunsMood] init OK"); })
-      .catch(function(e) { console.warn("[MunsMood] init prefetch failed:", e.message); });
-  }
 
   // --- Upload area ---
   uploadArea.addEventListener("click", function(e) {
@@ -307,43 +282,26 @@
     hideError();
 
     try {
-      // Get init data (API key + characters)
-      if (!mmInit) {
-        setProcessing("Conectando con los Muns...", "Un momento por favor");
-        try {
-          var r0 = await fetch(INIT_URL, { cache: "no-store" });
-          if (!r0.ok) throw new Error("HTTP " + r0.status + " al obtener configuración");
-          mmInit = await r0.json();
-        } catch(e) {
-          throw new Error("No se pudo conectar con el servidor: " + e.message);
-        }
+      setProcessing("Los Muns están en camino...", "Esto puede tardar unos segundos");
+      var r = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: currentBase64,
+          imageMime: currentMime,
+          width: currentWidth,
+          height: currentHeight
+        })
+      });
+      if (!r.ok) {
+        var errData = await r.json().catch(function() { return {}; });
+        throw new Error(errData.error || "Error del servidor (" + r.status + ")");
       }
+      var data = await r.json();
+      if (!data.composedImage) throw new Error("No se recibió imagen del servidor.");
 
-      var apiKey = mmInit.apiKey;
-      if (!apiKey) throw new Error("Configuración incompleta (sin API key).");
-
-      // Step 1: detect emotion via Gemini directly
-      setProcessing("Analizando tu foto... 🔍", "Detectando el momento especial");
-      var emotion = await detectEmotion(apiKey, currentBase64, currentMime);
-      console.log("[MunsMood] emotion:", emotion);
-
-      // Step 2: compose via Gemini directly
-      var cfg = EMOTION_ACTIONS[emotion] || EMOTION_ACTIONS.HAPPY_NEUTRAL;
-      setProcessing(cfg.text, "Los Muns ya están llegando ✨");
-      var composedImage = await composeImage(apiKey, currentBase64, currentMime, emotion, cfg);
-
-      // Step 3: validate result
-      setProcessing("Revisando el resultado... 🔍", "Un segundito");
-      var composedB64 = composedImage.split(",")[1];
-      var composedMime = composedImage.split(";")[0].replace("data:", "");
-      var valid = await validateResult(apiKey, composedB64, composedMime);
-      if (!valid) {
-        throw new Error("vamos de nuevo que salió movida 📸");
-      }
-
-      // Show result
-      resultImg.src = composedImage;
-      var dlBlob = dataURLtoBlob(composedImage);
+      resultImg.src = data.composedImage;
+      var dlBlob = dataURLtoBlob(data.composedImage);
       var dlUrl = URL.createObjectURL(dlBlob);
       btnDownload.href = dlUrl;
       btnDownload.download = "muns-foto.png";
@@ -355,168 +313,6 @@
       showError(e.message || "Algo salió mal. Intentá de nuevo.");
     }
   });
-
-  async function validateResult(apiKey, imgB64, mime) {
-    var body = {
-      contents: [{
-        parts: [
-          { inlineData: { data: imgB64, mimeType: mime } },
-          { text: "Esta imagen tiene una foto real con uno o dos personajes animados pequeños insertados (se llaman Mun y Opaq). Analizá con atención y respondé SOLO con SI o NO a cada punto:\n1. ¿Algún personaje tiene más de 2 brazos o más de 2 piernas visibles?\n2. ¿Algún personaje cubre o se superpone sobre el rostro de alguna persona?\n3. ¿Algún personaje es igual o más grande que la persona en la foto?\n\nRespondé exactamente así:\n1: SI o NO\n2: SI o NO\n3: SI o NO" }
-        ]
-      }],
-      generationConfig: { temperature: 0, maxOutputTokens: 30 }
-    };
-    try {
-      var r = await fetch(GEMINI + DETECT_MODEL + ":generateContent?key=" + apiKey, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (!r.ok) return true; // si falla la validación, dejamos pasar
-      var d = await r.json();
-      var parts = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || [];
-      var raw = "";
-      for (var pi = 0; pi < parts.length; pi++) {
-        if (parts[pi].text) { raw = parts[pi].text; }
-      }
-      console.log("[MunsMood] validation:", raw);
-      // Si cualquier respuesta es SI, la imagen no pasa
-      var lines = raw.toUpperCase().split("\n");
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i];
-        if (/^\d:/.test(line.trim()) && line.includes("SI")) return false;
-      }
-      return true;
-    } catch(e) {
-      console.warn("[MunsMood] validation error:", e);
-      return true; // si hay error, dejamos pasar
-    }
-  }
-
-  async function detectEmotion(apiKey, imgB64, mime) {
-    var body = {
-      contents: [{
-        parts: [
-          { inlineData: { data: imgB64, mimeType: mime } },
-          { text: "Analice la imagen con suma atención. Responda únicamente con una de estas categorías:\n- 'MULTIPLE_PEOPLE' si se observan dos o más personas.\n- 'HUG_TWO' si hay una sola persona con los brazos extendidos para un abrazo.\n- 'TONGUE_OUT' si hay una sola persona con la lengua fuera.\n- 'SAD' si hay una sola persona con expresión de angustia o tristeza.\n- 'HAPPY_NEUTRAL' en cualquier otro caso." }
-        ]
-      }],
-      generationConfig: { responseMimeType: "text/plain" }
-    };
-    var r = await fetch(GEMINI + DETECT_MODEL + ":generateContent?key=" + apiKey, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) {
-      var e = await r.json().catch(function() { return {}; });
-      throw new Error("Error en detección (" + r.status + "): " + (e.error && e.error.message || "desconocido"));
-    }
-    var d = await r.json();
-    var parts = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || [];
-    var raw = "";
-    for (var pi = 0; pi < parts.length; pi++) {
-      if (parts[pi].text) { raw = parts[pi].text; }
-    }
-    raw = raw.trim().toUpperCase();
-    console.log("[MunsMood] detect raw:", JSON.stringify(raw));
-    if (raw.includes("MULTIPLE_PEOPLE")) return "MULTIPLE_PEOPLE";
-    if (raw.includes("HUG_TWO")) return "HUG_TWO";
-    if (raw.includes("TONGUE_OUT")) return "TONGUE_OUT";
-    if (raw.includes("SAD")) return "SAD";
-    return "HAPPY_NEUTRAL";
-  }
-
-  function getAspectRatio(w, h) {
-    if (!w || !h) return "1:1";
-    var ratio = w / h;
-    if (ratio > 1.5) return "16:9";
-    if (ratio > 1.1) return "4:3";
-    if (ratio < 0.6) return "9:16";
-    if (ratio < 0.9) return "3:4";
-    return "1:1";
-  }
-
-  async function composeImage(apiKey, imgB64, mime, emotion, cfg) {
-    var specificAction = "";
-    var shouldHug = cfg.useMun && Math.random() < 0.3;
-
-    if (emotion === "TONGUE_OUT") {
-      specificAction = "La persona realiza un gesto ameno sacando la lengua. Mun y Opaq se posicionan de forma juguetona junto a ella; uno puede estar asomándose y el otro intentando subirse 'a cocochito' (piggyback) o apoyándose en su hombro de forma cariñosa.";
-    } else if (emotion === "MULTIPLE_PEOPLE") {
-      specificAction = "Se observa un grupo de personas. Mun se integra de forma natural, quizás apoyándose suavemente en el hombro de alguien o asomándose desde atrás con mucha confianza y afecto.";
-    } else if (emotion === "HUG_TWO") {
-      specificAction = "La persona ofrece un abrazo. Mun responde de forma activa: puede estar abrazando a la persona, apoyando su cabeza en su hombro o intentando trepar suavemente para un abrazo más cercano.";
-    } else if (emotion === "SAD") {
-      specificAction = "Se percibe tristeza. Opaq abraza a la persona con sus bracitos. El abrazo debe verse físico y real: Opaq rodea a la persona desde un costado o desde atrás, adaptando la posición de sus brazos a donde esté la persona en la foto. El rostro de la persona queda 100% visible. La cara de Opaq no cambia.";
-    } else {
-      specificAction = "Mun se ubica junto a la persona de forma muy natural, asomándose, apoyándose o incluso intentando subirse 'a cocochito' para salir en la foto de forma divertida.";
-    }
-
-    if (shouldHug) {
-      specificAction += " De manera excepcional, Mun está abrazando a la persona. Es ABSOLUTAMENTE CRÍTICO que los brazos de Mun nazcan de su propio cuerpo. Los brazos deben rodear a la persona manteniendo ESTRICTAMENTE sus proporciones; NO deben estirarse. El abrazo debe ser tierno y el rostro de la persona debe ser 100% visible.";
-    }
-
-    var prompt =
-      "REGLA #1 — LA MÁS IMPORTANTE DE TODAS: La cara de Mun y la cara de Opaq son INTOCABLES. Sus facciones, ojos, boca, expresión y forma de la cara son EXACTAMENTE iguales a las imágenes de referencia entregadas. No se modifican bajo ninguna circunstancia, sin importar la emoción de la foto ni la acción que realicen. La cara de Mun es siempre la cara de Mun. La cara de Opaq es siempre la cara de Opaq. Nunca cambian.\n\n" +
-      "TAREA: Insertar un pequeño personaje animado dentro de esta fotografía real, como si estuviera físicamente presente en la escena junto a la persona.\n\n" +
-      "EL PERSONAJE ES UNA CRIATURA PEQUEÑA E INDEPENDIENTE. No es un filtro ni una máscara. No se superpone sobre la persona. Aparece en la foto como un ser diminuto parado al lado, detrás, o sobre el hombro — NUNCA encima de la cara ni cubriendo ninguna parte de su cuerpo.\n\n" +
-      "REGLA CRÍTICA — APLICA TANTO A MUN COMO A OPAQ: Las extremidades de Mun y de Opaq (brazos y piernas) NUNCA se alargan ni estiran. Su longitud es fija, exactamente igual a la imagen de referencia de cada uno. Si Mun o Opaq no llegan a tocar algo con sus brazos de tamaño natural, su cuerpo entero se acerca — jamás estiran los brazos. Un brazo estirado o alargado en cualquiera de los dos personajes es un error grave.\n\n" +
-      "REGLAS OBLIGATORIAS:\n\n" +
-      "1. NUNCA CUBRIR EL ROSTRO HUMANO: El personaje jamás puede aparecer sobre la cara de la persona. Si está cerca, debe estar desplazado al costado, por encima del hombro o detrás. El rostro humano debe quedar 100% visible y sin nada encima.\n\n" +
-      "2. ESCALA PEQUEÑA: El personaje es SIEMPRE más pequeño que la persona. Su tamaño máximo equivale a la cabeza humana. Nunca puede ser igual ni más grande.\n\n" +
-      "3. CARA DEL PERSONAJE INMUTABLE: La cara del personaje es EXACTAMENTE igual a la imagen de referencia. No cambia su expresión, no imita gestos humanos, no saca la lengua, no pone cara triste, no sonríe diferente. Solo su cuerpo (torso, brazos, piernas) se adapta a la escena.\n\n" +
-      "4. LA FOTO NO SE MODIFICA: La fotografía original no se altera. No se agregan ni eliminan partes del cuerpo de la persona. No se cambia el encuadre ni el fondo. Solo se añade el personaje animado.\n\n" +
-      "5. CUERPO ÍNTEGRO Y CONECTADO: El personaje es un cuerpo único. Cada brazo nace del hombro y termina en una mano. Cada pierna nace de la cadera y termina en un pie. NINGUNA parte del cuerpo puede aparecer flotando, separada, ni superpuesta sobre otra parte del propio cuerpo. Una mano no puede aparecer por encima del torso ni del hombro. Si un brazo abraza, nace del hombro y rodea hacia afuera — nunca cruza por encima de la cabeza ni del propio cuerpo del personaje. Exactamente 2 brazos y 2 piernas, siempre.\n\n" +
-      "ACCIÓN: " + specificAction + "\n\n" +
-      "RESULTADO: La foto original sin ninguna modificación, con un pequeño personaje animado integrado naturalmente junto a la persona.";
-
-    var parts = [
-      { inlineData: { data: imgB64, mimeType: mime } },
-      { text: prompt }
-    ];
-    if (cfg.useMun && mmInit && mmInit.mun) {
-      parts.push({ inlineData: { data: mmInit.mun, mimeType: "image/png" } });
-      parts.push({ text: "DISEÑO ORIGINAL DE MUN — su cara es EXACTAMENTE así en el resultado. Prohibido cambiar su expresión facial bajo ninguna circunstancia." });
-    }
-    if (cfg.useOpaq && mmInit && mmInit.opaq) {
-      parts.push({ inlineData: { data: mmInit.opaq, mimeType: "image/png" } });
-      parts.push({ text: "DISEÑO ORIGINAL DE OPAQ — su cara es EXACTAMENTE así en el resultado. Prohibido cambiar su expresión facial bajo ninguna circunstancia." });
-    }
-
-    var aspectRatio = getAspectRatio(currentWidth, currentHeight);
-
-    var body = {
-      contents: [{ parts: parts }],
-      generationConfig: {
-        imageConfig: { aspectRatio: aspectRatio }
-      }
-    };
-
-    var r = await fetch(GEMINI + COMPOSE_MODEL + ":generateContent?key=" + apiKey, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) {
-      var e = await r.json().catch(function() { return {}; });
-      throw new Error("Error en composición (" + r.status + "): " + (e.error && e.error.message || "desconocido"));
-    }
-    var d = await r.json();
-    var candidates = d.candidates || [];
-    var imagePart = null;
-    for (var i = 0; i < candidates.length && !imagePart; i++) {
-      var parts2 = (candidates[i].content && candidates[i].content.parts) || [];
-      for (var j = 0; j < parts2.length; j++) {
-        if (parts2[j].inlineData) { imagePart = parts2[j]; break; }
-      }
-    }
-    if (!imagePart || !imagePart.inlineData) {
-      var reason = candidates[0] && candidates[0].finishReason;
-      throw new Error("No se recibió imagen del modelo" + (reason ? " (motivo: " + reason + ")" : "") + ". Intentá con otra foto.");
-    }
-    return "data:" + (imagePart.inlineData.mimeType || "image/png") + ";base64," + imagePart.inlineData.data;
-  }
 
   function dataURLtoBlob(dataUrl) {
     var arr = dataUrl.split(",");
