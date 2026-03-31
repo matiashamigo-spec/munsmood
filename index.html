@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MunsMood</title>
+</head>
+<body>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#mm-root{font-family:'Nunito',sans-serif;background:#fbfbff;min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5rem 1.25rem}
+#mm-card{width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;gap:1.5rem}
+
+/* Header */
+#mm-header{display:flex;flex-direction:column;align-items:center;gap:0.5rem;text-align:center}
+#mm-logo{height:48px;object-fit:contain}
+#mm-heading{font-size:1.6rem;font-weight:900;color:#1e1b4b;line-height:1.25;text-align:center}
+#mm-subheading{font-size:0.9rem;color:#6b7280;font-weight:500;text-align:center}
+
+/* Upload area */
+#mm-upload-area{width:100%;background:#fff;border:2px dashed #c7d2fe;border-radius:2.5rem;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;align-items:center;gap:0.75rem}
+#mm-upload-area:hover{border-color:#6366f1;background:#f5f3ff}
+#mm-upload-area.dragover{border-color:#4f46e5;background:#eef2ff}
+#mm-upload-icon{font-size:2.75rem;line-height:1}
+#mm-upload-title{font-size:1.05rem;font-weight:700;color:#1e1b4b}
+#mm-upload-sub{font-size:0.8rem;color:#9ca3af;font-weight:500}
+#mm-file-input{display:none}
+#mm-btn-camera-top{background:#eef2ff;color:#4f46e5;border:none;padding:0.6rem 1.25rem;border-radius:0.875rem;font-size:0.875rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:0.4rem}
+#mm-btn-camera-top:hover{background:#e0e7ff}
+
+/* Photo selected state */
+#mm-photo-state{width:100%;display:none;flex-direction:column;align-items:center;gap:1.25rem}
+#mm-photo-box{width:100%;background:#fff;border-radius:2.5rem;overflow:hidden;box-shadow:0 4px 24px rgba(99,102,241,0.12);position:relative}
+#mm-photo-img{width:100%;display:block;max-height:360px;object-fit:contain}
+#mm-photo-change{position:absolute;top:0.75rem;right:0.75rem;background:rgba(255,255,255,0.9);color:#4f46e5;border:none;padding:0.4rem 0.8rem;border-radius:0.625rem;font-size:0.75rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer;backdrop-filter:blur(8px)}
+#mm-btn-go{width:100%;background:#4f46e5;color:#fff;border:none;padding:1rem 2rem;border-radius:3.5rem;font-size:1.05rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:0.5rem;box-shadow:0 4px 16px rgba(79,70,229,0.35)}
+#mm-btn-go:hover{background:#6366f1;transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,70,229,0.45)}
+#mm-btn-go:disabled{background:#a5b4fc;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* Processing state */
+#mm-processing-state{width:100%;display:none;flex-direction:column;align-items:center;gap:1.5rem;text-align:center;padding:2rem}
+#mm-processing-icon{font-size:3.5rem;animation:mm-bounce 1.2s ease-in-out infinite}
+#mm-processing-text{font-size:1.1rem;font-weight:700;color:#4f46e5}
+#mm-processing-sub{font-size:0.85rem;color:#9ca3af;font-weight:500}
+@keyframes mm-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.mm-spinner{display:inline-block;width:18px;height:18px;border:2.5px solid rgba(79,70,229,0.2);border-top-color:#4f46e5;border-radius:50%;animation:mm-spin 0.7s linear infinite;vertical-align:middle}
+@keyframes mm-spin{to{transform:rotate(360deg)}}
+
+/* Result state */
+#mm-result-state{width:100%;display:none;flex-direction:column;align-items:center;gap:1.25rem}
+#mm-result-heading{font-size:1.4rem;font-weight:900;color:#1e1b4b;text-align:center}
+#mm-result-box{width:100%;background:#fff;border-radius:2.5rem;overflow:hidden;box-shadow:0 8px 32px rgba(99,102,241,0.18)}
+#mm-result-img{width:100%;display:block}
+#mm-result-actions{width:100%;display:flex;gap:0.75rem}
+#mm-btn-download{flex:1;background:#4f46e5;color:#fff;text-decoration:none;padding:0.9rem 1.5rem;border-radius:3.5rem;font-size:0.95rem;font-weight:700;font-family:'Nunito',sans-serif;text-align:center;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:0.4rem;box-shadow:0 4px 16px rgba(79,70,229,0.3)}
+#mm-btn-download:hover{background:#6366f1;transform:translateY(-1px)}
+#mm-btn-new{background:#f3f4f6;color:#374151;border:none;padding:0.9rem 1.25rem;border-radius:3.5rem;font-size:0.95rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+#mm-btn-new:hover{background:#e5e7eb}
+
+/* Error */
+#mm-error{display:none;width:100%;background:#fef2f2;border:1.5px solid #fecaca;border-radius:1.25rem;padding:1rem 1.25rem;color:#dc2626;font-size:0.875rem;font-weight:600;text-align:center}
+
+/* Camera modal */
+#mm-camera-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;align-items:center;justify-content:center;flex-direction:column;gap:1rem;padding:1rem}
+#mm-camera-modal.active{display:flex}
+#mm-video{width:100%;max-width:440px;border-radius:1.5rem;background:#000}
+#mm-camera-btns{display:flex;gap:0.75rem}
+#mm-capture-btn{background:#4f46e5;color:#fff;border:none;padding:0.9rem 2.25rem;border-radius:3.5rem;font-size:1rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer}
+#mm-cancel-camera{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:0.9rem 1.75rem;border-radius:3.5rem;font-size:0.9rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer}
+
+@media(max-width:480px){
+  #mm-heading{font-size:1.35rem}
+  #mm-upload-area{padding:2rem 1.25rem;border-radius:2rem}
+  #mm-photo-box,#mm-result-box{border-radius:2rem}
+  #mm-btn-go,#mm-btn-download,#mm-btn-new{border-radius:2.5rem}
+}
+</style>
+
+<div id="mm-root">
+  <div id="mm-card">
+
+    <!-- Header -->
+    <div id="mm-header">
+      <img decoding="async" id="mm-logo" src="https://muns.club/wp-content/uploads/2026/02/logo-muns-1.png" alt="Muns" onerror="this.style.display='none'">
+      <h2 id="mm-heading">Los Muns siempre con vos.</h2>
+      <p id="mm-subheading">Subí tu foto y los Muns se suman a tu momento ✨</p>
+    </div>
+
+    <!-- Upload state -->
+    <div id="mm-upload-area">
+      <div id="mm-upload-icon">🌙</div>
+      <p id="mm-upload-title">Arrastrá o tocá para elegir tu foto</p>
+      <p id="mm-upload-sub">JPG · PNG · WEBP · hasta 10 MB</p>
+      <button id="mm-btn-camera-top" type="button">📸 Usar cámara</button>
+    </div>
+    <input type="file" id="mm-file-input" accept="image/*">
+
+    <!-- Photo selected state -->
+    <div id="mm-photo-state">
+      <div id="mm-photo-box">
+        <img decoding="async" id="mm-photo-img" src="" alt="Tu foto">
+        <button id="mm-photo-change" type="button">✏️ Cambiar</button>
+      </div>
+      <button id="mm-btn-go" type="button">✨ Llamar a los Muns</button>
+    </div>
+
+    <!-- Processing state -->
+    <div id="mm-processing-state">
+      <div id="mm-processing-icon">✨</div>
+      <p id="mm-processing-text">Los Muns están en camino...</p>
+      <p id="mm-processing-sub">Esto puede tardar unos segundos</p>
+    </div>
+
+    <!-- Result state -->
+    <div id="mm-result-state">
+      <p id="mm-result-heading">¡Aquí estamos! 🌙</p>
+      <div id="mm-result-box">
+        <img decoding="async" id="mm-result-img" src="" alt="Tu foto con los Muns">
+      </div>
+      <div id="mm-result-actions">
+        <a id="mm-btn-download" href="#" download="muns-foto.png">⬇️ Guardar recuerdo</a>
+        <button id="mm-btn-new" type="button">Nueva foto</button>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="mm-error"></div>
+
+  </div>
+</div>
+
+<!-- Camera modal -->
+<div id="mm-camera-modal">
+  <video id="mm-video" autoplay playsinline muted></video>
+  <div id="mm-camera-btns">
+    <button id="mm-capture-btn" type="button">📸 Sacar foto</button>
+    <button id="mm-cancel-camera" type="button">Cancelar</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var INIT_URL = "https://infomuns.vercel.app/api/munsmood-init";
+  var GEMINI   = "https://generativelanguage.googleapis.com/v1beta/models/";
+  var DETECT_MODEL  = "gemini-3-flash-preview";
+  var COMPOSE_MODEL = "gemini-2.5-flash-image";
+
+  var uploadArea     = document.getElementById("mm-upload-area");
+  var fileInput      = document.getElementById("mm-file-input");
+  var btnCameraTop   = document.getElementById("mm-btn-camera-top");
+  var photoState     = document.getElementById("mm-photo-state");
+  var photoImg       = document.getElementById("mm-photo-img");
+  var photoChange    = document.getElementById("mm-photo-change");
+  var btnGo          = document.getElementById("mm-btn-go");
+  var processingState = document.getElementById("mm-processing-state");
+  var processingText  = document.getElementById("mm-processing-text");
+  var processingSub   = document.getElementById("mm-processing-sub");
+  var resultState    = document.getElementById("mm-result-state");
+  var resultImg      = document.getElementById("mm-result-img");
+  var btnDownload    = document.getElementById("mm-btn-download");
+  var btnNew         = document.getElementById("mm-btn-new");
+  var errorDiv       = document.getElementById("mm-error");
+  var cameraModal    = document.getElementById("mm-camera-modal");
+  var video          = document.getElementById("mm-video");
+  var captureBtn     = document.getElementById("mm-capture-btn");
+  var cancelCamera   = document.getElementById("mm-cancel-camera");
+
+  var currentBase64  = null;
+  var currentMime    = "image/jpeg";
+  var currentWidth   = 0;
+  var currentHeight  = 0;
+  var stream         = null;
+  var mmInit         = null; // { apiKey, mun, opaq }
+
+  var EMOTION_ACTIONS = {
+    HAPPY_NEUTRAL:   { text:"Los Muns te están acompañando 😊", useMun:true,  useOpaq:false },
+    SAD:             { text:"OPAQ llegó a darte un abrazo 🫂",   useMun:false, useOpaq:true  },
+    HUG_TWO:         { text:"¡MUN acepta el abrazo! 🤗",         useMun:true,  useOpaq:false },
+    TONGUE_OUT:      { text:"¡MUN y OPAQ también! 😜",           useMun:true,  useOpaq:true  },
+    MULTIPLE_PEOPLE: { text:"Los Muns se suman al grupo 🎉",     useMun:true,  useOpaq:false }
+  };
+
+  // Pre-fetch init (API key + character images)
+  prefetchInit();
+
+  function prefetchInit() {
+    fetch(INIT_URL, { cache: "no-store" })
+      .then(function(r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function(d) { mmInit = d; console.log("[MunsMood] init OK"); })
+      .catch(function(e) { console.warn("[MunsMood] init prefetch failed:", e.message); });
+  }
+
+  // --- Upload area ---
+  uploadArea.addEventListener("click", function(e) {
+    if (e.target === btnCameraTop || btnCameraTop.contains(e.target)) return;
+    fileInput.click();
+  });
+  uploadArea.addEventListener("dragover", function(e) {
+    e.preventDefault();
+    uploadArea.classList.add("dragover");
+  });
+  uploadArea.addEventListener("dragleave", function() {
+    uploadArea.classList.remove("dragover");
+  });
+  uploadArea.addEventListener("drop", function(e) {
+    e.preventDefault();
+    uploadArea.classList.remove("dragover");
+    var f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+  fileInput.addEventListener("change", function() {
+    if (fileInput.files[0]) loadFile(fileInput.files[0]);
+  });
+
+  // Change photo
+  photoChange.addEventListener("click", resetToUpload);
+
+  // --- Camera ---
+  btnCameraTop.addEventListener("click", function(e) {
+    e.stopPropagation();
+    openCamera();
+  });
+  captureBtn.addEventListener("click", capturePhoto);
+  cancelCamera.addEventListener("click", closeCamera);
+
+  function openCamera() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      .then(function(s) {
+        stream = s;
+        video.srcObject = s;
+        cameraModal.classList.add("active");
+      })
+      .catch(function() {
+        showError("No se pudo acceder a la cámara. Usá la opción de subir archivo.");
+      });
+  }
+
+  function capturePhoto() {
+    var canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    closeCamera();
+    resizeAndEncode(dataUrl, setPhoto);
+  }
+
+  function closeCamera() {
+    if (stream) { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
+    cameraModal.classList.remove("active");
+  }
+
+  // --- File loading ---
+  function loadFile(file) {
+    if (!file.type.startsWith("image/")) { showError("El archivo debe ser una imagen (JPG, PNG, WEBP)."); return; }
+    if (file.size > 10 * 1024 * 1024) { showError("La imagen es muy grande. Máximo 10 MB."); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) { resizeAndEncode(e.target.result, setPhoto); };
+    reader.readAsDataURL(file);
+  }
+
+  function resizeAndEncode(dataUrl, callback) {
+    var img = new Image();
+    img.onload = function() {
+      var MAX = 768;
+      var w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+        else        { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      var c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      callback(c.toDataURL("image/jpeg", 0.85), w, h);
+    };
+    img.src = dataUrl;
+  }
+
+  function setPhoto(dataUrl, w, h) {
+    currentBase64  = dataUrl.split(",")[1];
+    currentMime    = "image/jpeg";
+    currentWidth   = w || 0;
+    currentHeight  = h || 0;
+    photoImg.src   = dataUrl;
+    showState("photo");
+    hideError();
+  }
+
+  // --- New photo ---
+  btnNew.addEventListener("click", resetToUpload);
+
+  function resetToUpload() {
+    currentBase64 = null;
+    fileInput.value = "";
+    showState("upload");
+    hideError();
+  }
+
+  // --- Main action ---
+  btnGo.addEventListener("click", async function() {
+    if (!currentBase64) return;
+    showState("processing");
+    hideError();
+
+    try {
+      // Get init data (API key + characters)
+      if (!mmInit) {
+        setProcessing("Conectando con los Muns...", "Un momento por favor");
+        try {
+          var r0 = await fetch(INIT_URL, { cache: "no-store" });
+          if (!r0.ok) throw new Error("HTTP " + r0.status + " al obtener configuración");
+          mmInit = await r0.json();
+        } catch(e) {
+          throw new Error("No se pudo conectar con el servidor: " + e.message);
+        }
+      }
+
+      var apiKey = mmInit.apiKey;
+      if (!apiKey) throw new Error("Configuración incompleta (sin API key).");
+
+      // Step 1: detect emotion via Gemini directly
+      setProcessing("Analizando tu foto... 🔍", "Detectando el momento especial");
+      var emotion = await detectEmotion(apiKey, currentBase64, currentMime);
+      console.log("[MunsMood] emotion:", emotion);
+
+      // Step 2: compose via Gemini directly
+      var cfg = EMOTION_ACTIONS[emotion] || EMOTION_ACTIONS.HAPPY_NEUTRAL;
+      setProcessing(cfg.text, "Los Muns ya están llegando ✨");
+      var composedImage = await composeImage(apiKey, currentBase64, currentMime, emotion, cfg);
+
+      // Step 3: validate result
+      setProcessing("Revisando el resultado... 🔍", "Un segundito");
+      var composedB64 = composedImage.split(",")[1];
+      var composedMime = composedImage.split(";")[0].replace("data:", "");
+      var valid = await validateResult(apiKey, composedB64, composedMime);
+      if (!valid) {
+        throw new Error("vamos de nuevo que salió movida 📸");
+      }
+
+      // Show result
+      resultImg.src = composedImage;
+      var dlBlob = dataURLtoBlob(composedImage);
+      var dlUrl = URL.createObjectURL(dlBlob);
+      btnDownload.href = dlUrl;
+      btnDownload.download = "muns-foto.png";
+      showState("result");
+
+    } catch(e) {
+      console.error("[MunsMood] error:", e);
+      showState("photo");
+      showError(e.message || "Algo salió mal. Intentá de nuevo.");
+    }
+  });
+
+  async function validateResult(apiKey, imgB64, mime) {
+    var body = {
+      contents: [{
+        parts: [
+          { inlineData: { data: imgB64, mimeType: mime } },
+          { text: "Esta imagen tiene una foto real con uno o dos personajes animados pequeños insertados (se llaman Mun y Opaq). Analizá con atención y respondé SOLO con SI o NO a cada punto:\n1. ¿Algún personaje tiene más de 2 brazos o más de 2 piernas visibles?\n2. ¿Algún personaje cubre o se superpone sobre el rostro de alguna persona?\n3. ¿Algún personaje es igual o más grande que la persona en la foto?\n\nRespondé exactamente así:\n1: SI o NO\n2: SI o NO\n3: SI o NO" }
+        ]
+      }],
+      generationConfig: { temperature: 0, maxOutputTokens: 30 }
+    };
+    try {
+      var r = await fetch(GEMINI + DETECT_MODEL + ":generateContent?key=" + apiKey, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) return true; // si falla la validación, dejamos pasar
+      var d = await r.json();
+      var parts = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || [];
+      var raw = "";
+      for (var pi = 0; pi < parts.length; pi++) {
+        if (parts[pi].text) { raw = parts[pi].text; }
+      }
+      console.log("[MunsMood] validation:", raw);
+      // Si cualquier respuesta es SI, la imagen no pasa
+      var lines = raw.toUpperCase().split("\n");
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (/^\d:/.test(line.trim()) && line.includes("SI")) return false;
+      }
+      return true;
+    } catch(e) {
+      console.warn("[MunsMood] validation error:", e);
+      return true; // si hay error, dejamos pasar
+    }
+  }
+
+  async function detectEmotion(apiKey, imgB64, mime) {
+    var body = {
+      contents: [{
+        parts: [
+          { inlineData: { data: imgB64, mimeType: mime } },
+          { text: "Analice la imagen con suma atención. Responda únicamente con una de estas categorías:\n- 'MULTIPLE_PEOPLE' si se observan dos o más personas.\n- 'HUG_TWO' si hay una sola persona con los brazos extendidos para un abrazo.\n- 'TONGUE_OUT' si hay una sola persona con la lengua fuera.\n- 'SAD' si hay una sola persona con expresión de angustia o tristeza.\n- 'HAPPY_NEUTRAL' en cualquier otro caso." }
+        ]
+      }],
+      generationConfig: { responseMimeType: "text/plain" }
+    };
+    var r = await fetch(GEMINI + DETECT_MODEL + ":generateContent?key=" + apiKey, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      var e = await r.json().catch(function() { return {}; });
+      throw new Error("Error en detección (" + r.status + "): " + (e.error && e.error.message || "desconocido"));
+    }
+    var d = await r.json();
+    var parts = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || [];
+    var raw = "";
+    for (var pi = 0; pi < parts.length; pi++) {
+      if (parts[pi].text) { raw = parts[pi].text; }
+    }
+    raw = raw.trim().toUpperCase();
+    console.log("[MunsMood] detect raw:", JSON.stringify(raw));
+    if (raw.includes("MULTIPLE_PEOPLE")) return "MULTIPLE_PEOPLE";
+    if (raw.includes("HUG_TWO")) return "HUG_TWO";
+    if (raw.includes("TONGUE_OUT")) return "TONGUE_OUT";
+    if (raw.includes("SAD")) return "SAD";
+    return "HAPPY_NEUTRAL";
+  }
+
+  function getAspectRatio(w, h) {
+    if (!w || !h) return "1:1";
+    var ratio = w / h;
+    if (ratio > 1.5) return "16:9";
+    if (ratio > 1.1) return "4:3";
+    if (ratio < 0.6) return "9:16";
+    if (ratio < 0.9) return "3:4";
+    return "1:1";
+  }
+
+  async function composeImage(apiKey, imgB64, mime, emotion, cfg) {
+    var specificAction = "";
+    var shouldHug = cfg.useMun && Math.random() < 0.3;
+
+    if (emotion === "TONGUE_OUT") {
+      specificAction = "La persona realiza un gesto ameno sacando la lengua. Mun y Opaq se posicionan de forma juguetona junto a ella; uno puede estar asomándose y el otro intentando subirse 'a cocochito' (piggyback) o apoyándose en su hombro de forma cariñosa.";
+    } else if (emotion === "MULTIPLE_PEOPLE") {
+      specificAction = "Se observa un grupo de personas. Mun se integra de forma natural, quizás apoyándose suavemente en el hombro de alguien o asomándose desde atrás con mucha confianza y afecto.";
+    } else if (emotion === "HUG_TWO") {
+      specificAction = "La persona ofrece un abrazo. Mun responde de forma activa: puede estar abrazando a la persona, apoyando su cabeza en su hombro o intentando trepar suavemente para un abrazo más cercano.";
+    } else if (emotion === "SAD") {
+      specificAction = "Se percibe tristeza. Opaq abraza a la persona con sus bracitos. El abrazo debe verse físico y real: Opaq rodea a la persona desde un costado o desde atrás, adaptando la posición de sus brazos a donde esté la persona en la foto. El rostro de la persona queda 100% visible. La cara de Opaq no cambia.";
+    } else {
+      specificAction = "Mun se ubica junto a la persona de forma muy natural, asomándose, apoyándose o incluso intentando subirse 'a cocochito' para salir en la foto de forma divertida.";
+    }
+
+    if (shouldHug) {
+      specificAction += " De manera excepcional, Mun está abrazando a la persona. Es ABSOLUTAMENTE CRÍTICO que los brazos de Mun nazcan de su propio cuerpo. Los brazos deben rodear a la persona manteniendo ESTRICTAMENTE sus proporciones; NO deben estirarse. El abrazo debe ser tierno y el rostro de la persona debe ser 100% visible.";
+    }
+
+    var prompt =
+      "REGLA #1 — LA MÁS IMPORTANTE DE TODAS: La cara de Mun y la cara de Opaq son INTOCABLES. Sus facciones, ojos, boca, expresión y forma de la cara son EXACTAMENTE iguales a las imágenes de referencia entregadas. No se modifican bajo ninguna circunstancia, sin importar la emoción de la foto ni la acción que realicen. La cara de Mun es siempre la cara de Mun. La cara de Opaq es siempre la cara de Opaq. Nunca cambian.\n\n" +
+      "TAREA: Insertar un pequeño personaje animado dentro de esta fotografía real, como si estuviera físicamente presente en la escena junto a la persona.\n\n" +
+      "EL PERSONAJE ES UNA CRIATURA PEQUEÑA E INDEPENDIENTE. No es un filtro ni una máscara. No se superpone sobre la persona. Aparece en la foto como un ser diminuto parado al lado, detrás, o sobre el hombro — NUNCA encima de la cara ni cubriendo ninguna parte de su cuerpo.\n\n" +
+      "REGLA CRÍTICA — APLICA TANTO A MUN COMO A OPAQ: Las extremidades de Mun y de Opaq (brazos y piernas) NUNCA se alargan ni estiran. Su longitud es fija, exactamente igual a la imagen de referencia de cada uno. Si Mun o Opaq no llegan a tocar algo con sus brazos de tamaño natural, su cuerpo entero se acerca — jamás estiran los brazos. Un brazo estirado o alargado en cualquiera de los dos personajes es un error grave.\n\n" +
+      "REGLAS OBLIGATORIAS:\n\n" +
+      "1. NUNCA CUBRIR EL ROSTRO HUMANO: El personaje jamás puede aparecer sobre la cara de la persona. Si está cerca, debe estar desplazado al costado, por encima del hombro o detrás. El rostro humano debe quedar 100% visible y sin nada encima.\n\n" +
+      "2. ESCALA PEQUEÑA: El personaje es SIEMPRE más pequeño que la persona. Su tamaño máximo equivale a la cabeza humana. Nunca puede ser igual ni más grande.\n\n" +
+      "3. CARA DEL PERSONAJE INMUTABLE: La cara del personaje es EXACTAMENTE igual a la imagen de referencia. No cambia su expresión, no imita gestos humanos, no saca la lengua, no pone cara triste, no sonríe diferente. Solo su cuerpo (torso, brazos, piernas) se adapta a la escena.\n\n" +
+      "4. LA FOTO NO SE MODIFICA: La fotografía original no se altera. No se agregan ni eliminan partes del cuerpo de la persona. No se cambia el encuadre ni el fondo. Solo se añade el personaje animado.\n\n" +
+      "5. CUERPO ÍNTEGRO Y CONECTADO: El personaje es un cuerpo único. Cada brazo nace del hombro y termina en una mano. Cada pierna nace de la cadera y termina en un pie. NINGUNA parte del cuerpo puede aparecer flotando, separada, ni superpuesta sobre otra parte del propio cuerpo. Una mano no puede aparecer por encima del torso ni del hombro. Si un brazo abraza, nace del hombro y rodea hacia afuera — nunca cruza por encima de la cabeza ni del propio cuerpo del personaje. Exactamente 2 brazos y 2 piernas, siempre.\n\n" +
+      "ACCIÓN: " + specificAction + "\n\n" +
+      "RESULTADO: La foto original sin ninguna modificación, con un pequeño personaje animado integrado naturalmente junto a la persona.";
+
+    var parts = [
+      { inlineData: { data: imgB64, mimeType: mime } },
+      { text: prompt }
+    ];
+    if (cfg.useMun && mmInit && mmInit.mun) {
+      parts.push({ inlineData: { data: mmInit.mun, mimeType: "image/png" } });
+      parts.push({ text: "DISEÑO ORIGINAL DE MUN — su cara es EXACTAMENTE así en el resultado. Prohibido cambiar su expresión facial bajo ninguna circunstancia." });
+    }
+    if (cfg.useOpaq && mmInit && mmInit.opaq) {
+      parts.push({ inlineData: { data: mmInit.opaq, mimeType: "image/png" } });
+      parts.push({ text: "DISEÑO ORIGINAL DE OPAQ — su cara es EXACTAMENTE así en el resultado. Prohibido cambiar su expresión facial bajo ninguna circunstancia." });
+    }
+
+    var aspectRatio = getAspectRatio(currentWidth, currentHeight);
+
+    var body = {
+      contents: [{ parts: parts }],
+      generationConfig: {
+        imageConfig: { aspectRatio: aspectRatio }
+      }
+    };
+
+    var r = await fetch(GEMINI + COMPOSE_MODEL + ":generateContent?key=" + apiKey, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      var e = await r.json().catch(function() { return {}; });
+      throw new Error("Error en composición (" + r.status + "): " + (e.error && e.error.message || "desconocido"));
+    }
+    var d = await r.json();
+    var candidates = d.candidates || [];
+    var imagePart = null;
+    for (var i = 0; i < candidates.length && !imagePart; i++) {
+      var parts2 = (candidates[i].content && candidates[i].content.parts) || [];
+      for (var j = 0; j < parts2.length; j++) {
+        if (parts2[j].inlineData) { imagePart = parts2[j]; break; }
+      }
+    }
+    if (!imagePart || !imagePart.inlineData) {
+      var reason = candidates[0] && candidates[0].finishReason;
+      throw new Error("No se recibió imagen del modelo" + (reason ? " (motivo: " + reason + ")" : "") + ". Intentá con otra foto.");
+    }
+    return "data:" + (imagePart.inlineData.mimeType || "image/png") + ";base64," + imagePart.inlineData.data;
+  }
+
+  function dataURLtoBlob(dataUrl) {
+    var arr = dataUrl.split(",");
+    var mime = arr[0].match(/:(.*?);/)[1];
+    var bstr = atob(arr[1]);
+    var n = bstr.length;
+    var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bstr.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+
+  // --- State management ---
+  function showState(state) {
+    uploadArea.style.display      = state === "upload"      ? "" : "none";
+    photoState.style.display      = state === "photo"       ? "flex" : "none";
+    processingState.style.display = state === "processing"  ? "flex" : "none";
+    resultState.style.display     = state === "result"      ? "flex" : "none";
+    // Show file input row only in upload state
+    fileInput.style.display = "none";
+  }
+
+  function setProcessing(text, sub) {
+    processingText.textContent = text;
+    processingSub.textContent  = sub || "";
+  }
+
+  function showError(msg) {
+    errorDiv.textContent = "⚠️ " + msg;
+    errorDiv.style.display = "block";
+  }
+
+  function hideError() {
+    errorDiv.style.display = "none";
+  }
+
+})();
+</script>
+</body>
+</html>
