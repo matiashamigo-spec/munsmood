@@ -25,7 +25,6 @@
 #mm-upload-icon{font-size:2.75rem;line-height:1}
 #mm-upload-title{font-size:1.05rem;font-weight:700;color:#1e1b4b}
 #mm-upload-sub{font-size:0.8rem;color:#9ca3af;font-weight:500}
-#mm-upload-tip{font-size:0.78rem;color:#a5b4fc !important;font-weight:600}
 #mm-file-input{display:none}
 #mm-btn-camera-top{background:#eef2ff;color:#4f46e5;border:none;padding:0.6rem 1.25rem;border-radius:0.875rem;font-size:0.875rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:0.4rem}
 #mm-btn-camera-top:hover{background:#e0e7ff}
@@ -93,7 +92,7 @@
       <div id="mm-upload-icon">🌙</div>
       <p id="mm-upload-title">Arrastrá o tocá para elegir tu foto</p>
       <p id="mm-upload-sub">JPG · PNG · WEBP · hasta 10 MB</p>
-<button id="mm-btn-camera-top" type="button">📸 Usar cámara</button>
+      <button id="mm-btn-camera-top" type="button">📸 Usar cámara</button>
     </div>
     <input type="file" id="mm-file-input" accept="image/*">
 
@@ -211,7 +210,7 @@
         cameraModal.classList.add("active");
       })
       .catch(function() {
-        showError("La cámara de los Muns se durmió 🌙 Probá subiendo una foto desde tu galería.");
+        showError("No se pudo acceder a la cámara. Usá la opción de subir archivo.");
       });
   }
 
@@ -232,8 +231,8 @@
 
   // --- File loading ---
   function loadFile(file) {
-    if (!file.type.startsWith("image/")) { showError("Los Muns solo entienden fotos 🌙 Mandanos un JPG, PNG o WEBP."); return; }
-    if (file.size > 10 * 1024 * 1024) { showError("¡Esa foto es enorme! Los satélites Muns solo pueden con imágenes de hasta 10 MB 🚀"); return; }
+    if (!file.type.startsWith("image/")) { showError("El archivo debe ser una imagen (JPG, PNG, WEBP)."); return; }
+    if (file.size > 10 * 1024 * 1024) { showError("La imagen es muy grande. Máximo 10 MB."); return; }
     var reader = new FileReader();
     reader.onload = function(e) { resizeAndEncode(e.target.result, setPhoto); };
     reader.readAsDataURL(file);
@@ -296,11 +295,10 @@
       });
       if (!r.ok) {
         var errData = await r.json().catch(function() { return {}; });
-        if (r.status === 429) throw new Error("Los Muns están muy ocupados ahora 🌙 Esperá unos minutos y volvé a intentar.");
-        throw new Error(errData.error || "Los satélites de los Muns se volvieron locos 🚀 Volvé a intentar en un ratito.");
+        throw new Error(errData.error || "Error del servidor (" + r.status + ")");
       }
       var data = await r.json();
-      if (!data.composedImage) throw new Error("Los Muns intentaron llegar pero se perdieron en el camino 🌙 Probá de nuevo.");
+      if (!data.composedImage) throw new Error("No se recibió imagen del servidor.");
 
       resultImg.src = data.composedImage;
       var dlBlob = dataURLtoBlob(data.composedImage);
@@ -312,11 +310,7 @@
     } catch(e) {
       console.error("[MunsMood] error:", e);
       showState("photo");
-      var msg = e.message || "";
-      if (msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network")) {
-        msg = "Los satélites de los Muns se volvieron locos 🚀 Volvé a intentar en un ratito.";
-      }
-      showError(msg || "Los satélites de los Muns se volvieron locos 🚀 Volvé a intentar en un ratito.");
+      showError(e.message || "Algo salió mal. Intentá de nuevo.");
     }
   });
 
@@ -346,7 +340,7 @@
   }
 
   function showError(msg) {
-    errorDiv.textContent = msg;
+    errorDiv.textContent = "⚠️ " + msg;
     errorDiv.style.display = "block";
   }
 
