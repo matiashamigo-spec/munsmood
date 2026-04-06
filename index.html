@@ -234,7 +234,7 @@
   // --- File loading ---
   function loadFile(file) {
     if (!file.type.startsWith("image/")) { showError("Los Muns solo entienden fotos 🌙 Mandanos un JPG, PNG o WEBP."); return; }
-    if (file.size > 10 * 1024 * 1024) { showError("¡Esa foto es enorme! Los satélites Muns solo pueden con imágenes de hasta 10 MB 🛸"); return; }
+    if (file.size > 10 * 1024 * 1024) { showError("¡Esa foto es enorme! Los satélites Muns solo pueden con imágenes de hasta 10 MB 🚀"); return; }
     var reader = new FileReader();
     reader.onload = function(e) { resizeAndEncode(e.target.result, setPhoto); };
     reader.readAsDataURL(file);
@@ -298,7 +298,7 @@
       if (!r.ok) {
         var errData = await r.json().catch(function() { return {}; });
         if (r.status === 429) throw new Error("Los Muns están muy ocupados ahora 🌙 Esperá unos minutos y volvé a intentar.");
-        throw new Error(errData.error || "Los satélites de los Muns se volvieron locos 🛸 Volvé a intentar en un ratito.");
+        throw new Error(errData.error || "Los satélites de los Muns se volvieron locos 🚀 Volvé a intentar en un ratito.");
       }
       var data = await r.json();
       if (!data.composedImage) throw new Error("Los Muns intentaron llegar pero se perdieron en el camino 🌙 Probá de nuevo.");
@@ -315,9 +315,9 @@
       showState("photo");
       var msg = e.message || "";
       if (msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("network")) {
-        msg = "Los satélites de los Muns se volvieron locos 🛸 Volvé a intentar en un ratito.";
+        msg = "Los satélites de los Muns se volvieron locos 🚀 Volvé a intentar en un ratito.";
       }
-      showError(msg || "Los satélites de los Muns se volvieron locos 🛸 Volvé a intentar en un ratito.");
+      showError(msg || "Los satélites de los Muns se volvieron locos 🚀 Volvé a intentar en un ratito.");
     }
   });
 
