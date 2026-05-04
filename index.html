@@ -68,6 +68,7 @@
 #mm-camera-btns{display:flex;gap:0.75rem}
 #mm-capture-btn{background:#4f46e5;color:#fff;border:none;padding:0.9rem 2.25rem;border-radius:3.5rem;font-size:1rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer}
 #mm-cancel-camera{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:0.9rem 1.75rem;border-radius:3.5rem;font-size:0.9rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer}
+#mm-flip-camera{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:0.9rem 1.25rem;border-radius:3.5rem;font-size:0.9rem;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer}
 
 @media(max-width:480px){
   #mm-heading{font-size:1.35rem}
@@ -135,6 +136,7 @@
   <video id="mm-video" autoplay playsinline muted></video>
   <div id="mm-camera-btns">
     <button id="mm-capture-btn" type="button">📸 Sacar foto</button>
+    <button id="mm-flip-camera" type="button">🔄 Girar</button>
     <button id="mm-cancel-camera" type="button">Cancelar</button>
   </div>
 </div>
@@ -161,6 +163,7 @@
   var cameraModal    = document.getElementById("mm-camera-modal");
   var video          = document.getElementById("mm-video");
   var captureBtn     = document.getElementById("mm-capture-btn");
+  var flipCamera     = document.getElementById("mm-flip-camera");
   var cancelCamera   = document.getElementById("mm-cancel-camera");
 
   var currentBase64  = null;
@@ -168,6 +171,7 @@
   var currentWidth   = 0;
   var currentHeight  = 0;
   var stream         = null;
+  var facingMode     = "user";
 
   // --- Upload area ---
   uploadArea.addEventListener("click", function(e) {
@@ -200,10 +204,11 @@
     openCamera();
   });
   captureBtn.addEventListener("click", capturePhoto);
+  flipCamera.addEventListener("click", switchCamera);
   cancelCamera.addEventListener("click", closeCamera);
 
   function openCamera() {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: false })
       .then(function(s) {
         stream = s;
         video.srcObject = s;
@@ -211,6 +216,20 @@
       })
       .catch(function() {
         showError("La cámara de los Muns se durmió 🌙 Probá subiendo una foto desde tu galería.");
+      });
+  }
+
+  function switchCamera() {
+    facingMode = facingMode === "user" ? "environment" : "user";
+    if (stream) { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: false })
+      .then(function(s) {
+        stream = s;
+        video.srcObject = s;
+      })
+      .catch(function() {
+        facingMode = facingMode === "user" ? "environment" : "user";
+        showError("No se pudo cambiar la cámara 🌙 Este dispositivo puede que tenga una sola.");
       });
   }
 
